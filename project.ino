@@ -4,7 +4,7 @@
 // Define 4 independent NeoPixel control objects
 Adafruit_NeoPixel strips[4] = {
   Adafruit_NeoPixel(NUM_LEDS_PER_STRIP, 0, NEO_GRB + NEO_KHZ800),
-  Adafruit_NeoPixel(NUM_LEDS_PER_STRIP, 1, NEO_GRB + NEO_KHZ800),
+  Adafruit_NeoPixel(NUM_LEDS_PER_STRIP, 1, NEO_GRBW + NEO_KHZ800),
   Adafruit_NeoPixel(NUM_LEDS_PER_STRIP, 2, NEO_GRB + NEO_KHZ800),
   Adafruit_NeoPixel(NUM_LEDS_PER_STRIP, 3, NEO_GRB + NEO_KHZ800)
 };
@@ -56,13 +56,13 @@ void loop() {
       int peak = constrain(sensors[i].maxAdcInWindow, sensors[i].offset, ADC_MAX_VAL);
       float weight = map(peak, sensors[i].offset, ADC_MAX_VAL, 0, 10000) / 1000.0;
       
-      // Threshold check: if less than 0.3kg, treat as 0
-      if (weight < 0.3) {
+      if (weight < 3) {
         weight = 0.00;
-        strips[i].clear(); // Turn off if weight is below 0.3kg
+        strips[i].clear();
       } else {
         // Display color only if greater than threshold
-        uint16_t hue = map(peak, sensors[i].offset, ADC_MAX_VAL, 21845, 0);
+        float constrainedWeight = constrain(weight, 3.0, 10.0);
+        uint16_t hue = map(constrainedWeight * 100, 300, 1000, 21845, 0);
         strips[i].fill(strips[i].ColorHSV(hue, 255, 255));
       }
       strips[i].show();
