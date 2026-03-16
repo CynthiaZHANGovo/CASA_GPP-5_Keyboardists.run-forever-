@@ -4,7 +4,7 @@
 // Define 4 independent NeoPixel control objects
 Adafruit_NeoPixel strips[4] = {
   Adafruit_NeoPixel(NUM_LEDS_PER_STRIP, 0, NEO_GRB + NEO_KHZ800),
-  Adafruit_NeoPixel(NUM_LEDS_PER_STRIP, 1, NEO_GRBW + NEO_KHZ800),
+  Adafruit_NeoPixel(NUM_LEDS_PER_STRIP, 1, NEO_GRB + NEO_KHZ800),
   Adafruit_NeoPixel(NUM_LEDS_PER_STRIP, 2, NEO_GRB + NEO_KHZ800),
   Adafruit_NeoPixel(NUM_LEDS_PER_STRIP, 3, NEO_GRB + NEO_KHZ800)
 };
@@ -56,7 +56,7 @@ void loop() {
       int peak = constrain(sensors[i].maxAdcInWindow, sensors[i].offset, ADC_MAX_VAL);
       float weight = map(peak, sensors[i].offset, ADC_MAX_VAL, 0, 10000) / 1000.0;
       
-      if (weight < 3) {
+      if (weight < 3.5) {
         weight = 0.00;
         strips[i].clear();
       } else {
