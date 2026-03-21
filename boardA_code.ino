@@ -22,8 +22,8 @@ float activeWeight[4]      = {0, 0, 0, 0};
 bool  weStartedThis[4]     = {false, false, false, false}; 
 unsigned long startTime[4] = {0, 0, 0, 0};      
 unsigned long lastClearTime[4] = {0, 0, 0, 0};  
-const unsigned long TIMEOUT_MS  = 7000;         
-const unsigned long COOLDOWN_MS = 750;          
+const unsigned long TIMEOUT_MS  = 7000;         // Max time a target stays active
+const unsigned long COOLDOWN_MS = 750;          // Cooldown after a hit is cleared
 
 int fsrToLocalLED[4] = {0, 1, 2, 3}; 
 
@@ -35,58 +35,65 @@ Adafruit_NeoPixel strips[4] = {
   Adafruit_NeoPixel(NUM_LEDS_PER_STRIP, 3, NEO_GRB + NEO_KHZ800)
 };
 
+// [Enhanced DSP Structure]
 struct FSRSensor {
   int pin;
   int offset;
-  int maxAdcInWindow;
+  int maxAdcInWindow; // Used to store the peak value within the sliding window
+  float filteredVal;  // Used to store the real-time value after EMA filtering
 };
-FSRSensor sensors[4] = {{A1, 0, 0}, {A2, 0, 0}, {A3, 0, 0}, {A4, 0, 0}};
+FSRSensor sensors[4] = {{A1, 0, 0, 0.0f}, {A2, 0, 0, 0.0f}, {A3, 0, 0, 0.0f}, {A4, 0, 0, 0.0f}};
 
 const int ADC_MAX_VAL = 630;
 const float HIT_THRESHOLD = 4.5; 
+const float EMA_ALPHA = 0.3; // [DSP Parameter] Filtering coefficient (0-1), lower is smoother
 
 WiFiClient mkrClient;
 PubSubClient client(mkrClient);
 
-// ================= RTOS 资源 =================
+// ================= RTOS RESOURCES =================
 struct MqttMessage {
   int id;
   float val;
 };
 QueueHandle_t mqttQueue;
-SemaphoreHandle_t ledMutex; // 互斥锁：保护灯带操作不被中断
+SemaphoreHandle_t ledMutex; 
 
 // ================= FUNCTIONS =================
 
 void triggerLED(int ledIdx, float weight) {
   if (ledIdx < 0 || ledIdx > 3) return;
   
-  // 获取互斥锁，确保操作灯带时不被打断
   if (xSemaphoreTake(ledMutex, portMAX_DELAY) == pdTRUE) {
-    if (weight < 0.1) strips[ledIdx].clear();
-    else {
+    if (weight < 0.1) {
+      strips[ledIdx].clear();
+    } else {
+      // Map weight to LED color (Blue to Red)
       float constrainedWeight = constrain(weight, 4.5, 10.0);
       uint16_t hue = map(constrainedWeight * 100, 450, 1000, 21845, 0); 
       strips[ledIdx].fill(strips[ledIdx].ColorHSV(hue, 255, 255));
     }
     strips[ledIdx].show();
-    xSemaphoreGive(ledMutex); // 释放锁
+    xSemaphoreGive(ledMutex);
   }
 }
 
 void callback(char* topic, byte* payload, unsigned int length) {
   String msg;
   for (int i = 0; i < length; i++) msg += (char)payload[i];
+  
+  // Extract ID from the end of the topic
   int receivedID = String(topic).substring(String(topic).lastIndexOf('/') + 1).toInt();
   float receivedWeight = msg.toFloat();
 
+  // Mapping logic for specific hardware orientation
   int targetLED = receivedID;
   if (receivedID == 0) targetLED = 2;      
-  else if (receivedID == 2) targetLED = 0; 
+  else if (receivedID == 2) targetLED = 0;  
 
   if (receivedWeight > 0) {
     activeWeight[targetLED] = receivedWeight;
-    weStartedThis[targetLED] = false; 
+    weStartedThis[targetLED] = false; // Triggered by remote board
     startTime[targetLED] = millis(); 
     triggerLED(targetLED, receivedWeight);
   } else {
@@ -96,19 +103,27 @@ void callback(char* topic, byte* payload, unsigned int length) {
   }
 }
 
-// ================= RTOS 任务 1: 采样与业务逻辑 =================
+// ================= RTOS TASK 1: SENSING & BUSINESS LOGIC =================
 void TaskSensing(void *pvParameters) {
   unsigned long lastWindowTime = millis();
   
   for (;;) {
     unsigned long currentMillis = millis();
 
+    // [DSP Optimization: EMA Filtering + Peak Capture]
     for(int i = 0; i < 4; i++) {
-      int val = analogRead(sensors[i].pin);
-      if (val > sensors[i].maxAdcInWindow) sensors[i].maxAdcInWindow = val;
+      int rawVal = analogRead(sensors[i].pin);
+      
+      // EMA Formula: St = α * Xt + (1 - α) * St-1
+      sensors[i].filteredVal = (EMA_ALPHA * (float)rawVal) + ((1.0f - EMA_ALPHA) * sensors[i].filteredVal);
+      
+      // Update the maximum value found in the current sliding window
+      if (sensors[i].filteredVal > (float)sensors[i].maxAdcInWindow) {
+        sensors[i].maxAdcInWindow = (int)sensors[i].filteredVal;
+      }
     }
 
-    // 超时检测
+    // 1. Timeout Detection (Logic remains unchanged)
     for(int i = 0; i < 4; i++) {
       if (activeWeight[i] > 0 && (currentMillis - startTime[i] >= TIMEOUT_MS)) {
         activeWeight[i] = 0;
@@ -122,18 +137,20 @@ void TaskSensing(void *pvParameters) {
       }
     }
 
-    // 结算逻辑
+    // 2. Sliding Window Resolution Logic (Determines a hit every 700ms)
     if (currentMillis - lastWindowTime >= 700) {
       bool isAnyActive = false;
       for(int j=0; j<4; j++) { if(activeWeight[j] > 0) isAnyActive = true; }
 
       for(int i = 0; i < 4; i++) {
+        // Use the filtered peak value for mapping
         int peak = constrain(sensors[i].maxAdcInWindow, sensors[i].offset, ADC_MAX_VAL);
-        float weight = map(peak, sensors[i].offset, ADC_MAX_VAL, 0, 10000) / 1000.0;
+        float weight = map(peak, sensors[i].offset, ADC_MAX_VAL, 0, 10000) / 1000.0f;
         int ledIdx = fsrToLocalLED[i];
 
         if (weight >= HIT_THRESHOLD) {
           if (activeWeight[ledIdx] == 0) {
+            // Logic to start a hit (send to the other board)
             if (!isAnyActive && (currentMillis - lastClearTime[ledIdx] >= COOLDOWN_MS)) {
               activeWeight[ledIdx] = weight;
               weStartedThis[ledIdx] = true;
@@ -144,6 +161,7 @@ void TaskSensing(void *pvParameters) {
             }
           } 
           else if (!weStartedThis[ledIdx]) {
+            // Logic to clear a hit received from the other board
             if (weight >= activeWeight[ledIdx]) {
               activeWeight[ledIdx] = 0;
               weStartedThis[ledIdx] = false;
@@ -154,16 +172,17 @@ void TaskSensing(void *pvParameters) {
             }
           }
         }
+        // Reset window peak for the next sliding window cycle
         sensors[i].maxAdcInWindow = 0; 
       }
       lastWindowTime = currentMillis;
     }
-    // 关键：给 WiFi 留出呼吸空间
-    vTaskDelay(pdMS_TO_TICKS(25)); 
+    
+    vTaskDelay(pdMS_TO_TICKS(20)); // Increase sampling frequency to 50Hz for EMA requirements
   }
 }
 
-// ================= RTOS 任务 2: 网络任务 =================
+// ================= RTOS TASK 2: NETWORK TASK =================
 void TaskNetwork(void *pvParameters) {
   for (;;) {
     if (WiFi.status() == WL_CONNECTED) {
@@ -175,7 +194,7 @@ void TaskNetwork(void *pvParameters) {
       client.loop();
     }
 
-    // 处理发送队列
+    // Process outgoing MQTT messages from the queue
     MqttMessage outMsg;
     if (xQueueReceive(mqttQueue, &outMsg, 0) == pdPASS) {
       String topic = "student/boxing/" + myID + "/sensor/" + String(outMsg.id);
@@ -190,47 +209,35 @@ void TaskNetwork(void *pvParameters) {
 void setup() {
   Serial.begin(115200);
 
-  // 1. 初始化灯带和校准
+  // 1. Initialize LED strips and perform calibration
   for(int i = 0; i < 4; i++) {
     strips[i].begin();
     strips[i].setBrightness(50);
     strips[i].show();
     long sum = 0;
     for(int j = 0; j < 30; j++) sum += analogRead(sensors[i].pin);
-    sensors[i].offset = sum / 30;
+    sensors[i].offset = (int)(sum / 30);
+    sensors[i].filteredVal = (float)sensors[i].offset; // [DSP Initialization]
   }
 
-  // 2. 先连 WiFi，再开 RTOS
-  Serial.print("Connecting WiFi...");
+  // 2. Network connection (WiFi.begin logic simplified)
   WiFi.begin(ssid, password);
-  unsigned long wifiStart = millis();
-  while (WiFi.status() != WL_CONNECTED && millis() - wifiStart < 15000) {
-    delay(500);
-    Serial.print(".");
-  }
-  
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\nWiFi Connected!");
-    // 开机闪烁
-    for(int i=0; i<4; i++) strips[i].fill(strips[i].Color(100,100,100));
-    for(int i=0; i<4; i++) strips[i].show();
-    delay(1000);
-    for(int i=0; i<4; i++) strips[i].clear();
-    for(int i=0; i<4; i++) strips[i].show();
-  }
+  while (WiFi.status() != WL_CONNECTED) { delay(500); }
 
   client.setServer(mqtt_server, mqtt_port);
   client.setCallback(callback);
 
-  // 3. 创建 RTOS 资源
+  // 3. Create RTOS Resources
   mqttQueue = xQueueCreate(10, sizeof(MqttMessage));
   ledMutex  = xSemaphoreCreateMutex();
 
-  // 网络任务优先级设为 2，采样设为 2，让它们平等竞争 CPU
+  // Start Tasks
   xTaskCreate(TaskSensing, "Sensing", 512, NULL, 2, NULL); 
   xTaskCreate(TaskNetwork, "Network", 1024, NULL, 2, NULL); 
 
   vTaskStartScheduler();
 }
 
-void loop() {}
+void loop() {
+  // FreeRTOS takes over control; loop remains empty
+}
