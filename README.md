@@ -108,22 +108,25 @@ This project presented *Punch Reach*, an interactive punching training system co
 
 ## References
 
-Han, Y., Syed Ali, S.K.B. and Ji, L. (2022) ‘Feedback for promoting motor skill learning in physical education: A trial sequential meta-analysis’, _International Journal of Environmental Research and Public Health_, 19(22), p. 15361.
+Cui, G. and Wang, C. (2025) ‘Applications and development trends of textile materials in sports: A review’, *Alexandria Engineering Journal*, 126, pp. 491–506.
 
-Lee-Cultura, S. and Giannakos, M. (2020) ‘Embodied interaction and spatial skills: A systematic review of empirical studies’, _Interacting with Computers_, 32(4), pp. 331–366.
+Han, Y., Syed Ali, S.K.B. and Ji, L. (2022) ‘Feedback for promoting motor skill learning in physical education: A trial sequential meta-analysis’, *International Journal of Environmental Research and Public Health*, 19(22), p. 15361.
 
-Wang, Z., Song, B., Liu, C., Ma, H., Bai, Z., Carneiro, M.A.S., Youssef, L., Chen, C., Zhang, L. and Wang, D. _et al_. (2025) ‘Effects of boxing exercise in people with Parkinson’s disease: a systematic review’, _Frontiers in Aging Neuroscience_, 17, p. 1505326.
+Isaac, C.W. and Duddeck, F. (2022) ‘Current trends in additively manufactured (3D printed) energy absorbing structures for crashworthiness application – a review’, *Virtual and Physical Prototyping*, 17(3), pp. 672–708. doi:10.1080/17452759.2022.2073792.
 
-Zhou, T., Zhang, S., Liu, S. and Yu, J. (2025) ‘Digital technology integration in home-based exercise: a systematic review of research evolution, applications, and impact mechanisms’, _BMC Public Health_, 25(1), p. 3528.\
-Zhang, G., Feng, R., Li, J., Zhou, Y., Zhou, X. and Wang, A. (2022) ‘Lightweight design of shock-absorbing and load-bearing components based on 3D printing technology’, \*Coatings\*, 12(6), pp. 1–16. doi:10.3390/coatings12060799.\
-Isaac, C.W. and Duddeck, F. (2022) ‘Current trends in additively manufactured (3D printed) energy absorbing structures for crashworthiness application – a review’, \*Virtual and Physical Prototyping\*, 17(3), pp. 672–708. doi:10.1080/17452759.2022.2073792.
+Lee-Cultura, S. and Giannakos, M. (2020) ‘Embodied interaction and spatial skills: A systematic review of empirical studies’, *Interacting with Computers*, 32(4), pp. 331–366.
 
-Cui, G. and Wang, C. (2025) ‘Applications and development trends of textile materials in sports: A review’, _Alexandria Engineering Journal_, 126, pp. 491–506.
+MacDonald, E., Salas, R., Espalin, D., Perez, M., Aguilera, E., Muse, D. and Wicker, R.B. (2014) ‘3D printing for the rapid prototyping of structural electronics’, *IEEE Access*, 2, pp. 234–242.
 
-MacDonald, E., Salas, R., Espalin, D., Perez, M., Aguilera, E., Muse, D. and Wicker, R.B. (2014) ‘3D printing for the rapid prototyping of structural electronics’, _IEEE Access_, 2, pp. 234–242.
+Penta, F., Amodeo, G., Gloria, A., Martorelli, M., Odenwald, S. and Lanzotti, A. (2018) ‘Low-velocity impacts on a polymeric foam for the passive safety improvement of sports fields: meshless approach and experimental validation’, *Applied Sciences*, 8(7), p. 1174.
 
-Penta, F., Amodeo, G., Gloria, A., Martorelli, M., Odenwald, S. and Lanzotti, A. (2018) ‘Low-velocity impacts on a polymeric foam for the passive safety improvement of sports fields: meshless approach and experimental validation’, _Applied Sciences_, 8(7), p. 1174.
+Tomin, M. and Kmetty, Á. (2022) ‘Polymer foams as advanced energy absorbing materials for sports applications—A review’, *Journal of Applied Polymer Science*, 139(9), p. 51714.
 
-Tomin, M. and Kmetty, Á. (2022) ‘Polymer foams as advanced energy absorbing materials for sports applications—A review’, _Journal of Applied Polymer Science_, 139(9), p. 51714.
+Wang, Z., Song, B., Liu, C., Ma, H., Bai, Z., Carneiro, M.A.S., Youssef, L., Chen, C., Zhang, L. and Wang, D. et al. (2025) ‘Effects of boxing exercise in people with Parkinson’s disease: a systematic review’, *Frontiers in Aging Neuroscience*, 17, p. 1505326.
+
+Zhang, G., Feng, R., Li, J., Zhou, Y., Zhou, X. and Wang, A. (2022) ‘Lightweight design of shock-absorbing and load-bearing components based on 3D printing technology’, *Coatings*, 12(6), pp. 1–16. doi:10.3390/coatings12060799.
+
+Zhou, T., Zhang, S., Liu, S. and Yu, J. (2025) ‘Digital technology integration in home-based exercise: a systematic review of research evolution, applications, and impact mechanisms’, *BMC Public Health*, 25(1), p. 3528.
+
 
 ---
