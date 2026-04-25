@@ -1,3 +1,4 @@
+
 # Introduction and Motivation
 
 Exercise using boxing is becoming an increasingly popular type of training, as it incorporates high levels of physical exertion, coordination and prolonged involvement. Recent studies suggest that boxing exercise offers benefits beyond general fitness, including improvements in strength, balance, mobility, and exercise adherence, making it suitable for a wide range of individuals (Wang _et al_., 2025). However, effective punching training should not rely solely on repetition, but also emphasise feedback on movement quality, timing, and performance.
@@ -22,7 +23,7 @@ In order to house the microcontroller and wiring, a 3D-printed enclosure was use
 
 The enclosure is the physical interface between the user and the system, not just a protective shell, but a structurally engineered component, which brings together interaction, protection and ergonomics. The design has gone through four iterations, as shown below:
 
-![Enclosure Iterations](https://raw.githubusercontent.com/CynthiaZHANGovo/CASA_GPP-5_Keyboardists.run-forever-/main/Documents/pictures/improvement.png)
+<img src="https://raw.githubusercontent.com/CynthiaZHANGovo/CASA_GPP-5_Keyboardists.run-forever-/main/Documents/pictures/improvement.png" alt="Enclosure Iterations">
 
 The initial prototypes were aimed at defining a working surface of a strike with a simple sensor arrangement. The second generation substituted a traditional screen with a ring of LEDs cut into the panel, spatially aligned to the point of impact and ensuring that the reaction of the system was much more immediate and legible. The third version was the most drastic structural change: MCU and core control circuitry were moved to an external 3D-printed control box, which is physically disconnected to the strike body. This isolation allows percussion of high frequency to avoid loosening connections and weakening delicate components, significantly enhancing the long-term reliability, similar in spirit to lightweight shock-absorbing load-bearing components designed using 3D printing (Zhang _et al_., 2022). The last design enhanced the cable routing by guiding the wires through special exit holes into the control box and getting rid of the dangers of exposed or trapped cords.
 
@@ -37,24 +38,22 @@ Through these iterations, the enclosure began a change to an active, load-carryi
 ## Hardware Implementation and Circuit Design
 
 This section outlines the hardware components and the circuit architecture utilized in the project. The system is built around the Arduino MKR WiFi 1010, which serves as the central processing unit. This microcontroller was selected for its compact form factor, native WiFi connectivity for potential IoT integration, and sufficient I/O pins to manage the project's analog and digital requirements simultaneously.
-
-![MCU](https://raw.githubusercontent.com/CynthiaZHANGovo/CASA_GPP-5_Keyboardists.run-forever-/main/Documents/pictures/%20MCU.png)
-
+<img src="https://raw.githubusercontent.com/CynthiaZHANGovo/CASA_GPP-5_Keyboardists.run-forever-/main/Documents/pictures/%20MCU.png" alt="MCU" width="300">
 ### Sensors and Inputs
 
 The primary input mechanisms are four FSR402 Force-Sensitive Resistors. These sensors dynamically alter their electrical resistance based on the physical pressure applied to their circular sensing areas. To interface these analog components with the microcontroller, they are configured within voltage divider circuits. As depicted in the system schematic, each FSR is connected in series with a $100\Omega$ pull-down resistor. One terminal of each FSR connects to the power supply (VCC), while the junction between the FSR and the pull-down resistor is routed to the Arduino's analog input pins (A2, A3, A4, and A5). This specific configuration allows the microcontroller's ADC (Analog-to-Digital Converter) to read varying voltage levels that directly correspond to the physical force applied to each sensor.
 
-![Sensor](https://raw.githubusercontent.com/CynthiaZHANGovo/CASA_GPP-5_Keyboardists.run-forever-/main/Documents/pictures/%20Sensor.png)
+<img src="https://raw.githubusercontent.com/CynthiaZHANGovo/CASA_GPP-5_Keyboardists.run-forever-/main/Documents/pictures/%20Sensor.png" alt="Sensor" width="300">
 
 ### Actuators and Outputs
 
 For visual feedback, the system incorporates four individual Addressable LED Strips. To ensure stable operation and avoid overloading the microcontroller's logic pins, the strips draw their main power from the shared 5V line and share a common ground (GND). The data input lines (Din) for the four separate LED strips are connected to the Arduino's digital PWM-capable pins (D0, D1, D2, and D3). By assigning a dedicated data pin to each strip, the system can independently control the lighting behavior, brightness, and color of each array in real-time.
 
-![LED](https://raw.githubusercontent.com/CynthiaZHANGovo/CASA_GPP-5_Keyboardists.run-forever-/main/Documents/pictures/led.png)
+<img src="https://raw.githubusercontent.com/CynthiaZHANGovo/CASA_GPP-5_Keyboardists.run-forever-/main/Documents/pictures/led.png" alt="LED" width="300">
 
 Overall, the circuit is designed for multi-channel, responsive interaction. The hardware effectively maps four independent physical input channels to four distinct visual output channels (the LED strips) through the central processing of the MKR WiFi 1010.
 
-![Diagram](https://raw.githubusercontent.com/CynthiaZHANGovo/CASA_GPP-5_Keyboardists.run-forever-/main/Documents/pictures/diagram.png)
+<img src="https://raw.githubusercontent.com/CynthiaZHANGovo/CASA_GPP-5_Keyboardists.run-forever-/main/Documents/pictures/diagram.png" alt="Diagram" width="500">
 
 ## Software Design
 
@@ -62,26 +61,22 @@ The software architecture for this IoT system is developed in C++ and leverages 
 
 ### **FreeRTOS Task Management**
 
-The system executes two independent execution threads: TaskSensing and TaskNetwork. TaskSensing operates at a strict 50Hz frequency, handling analog-to-digital conversions and resolving the core game state machine. Meanwhile, TaskNetwork asynchronously manages incoming and outgoing MQTT payloads. This decoupling ensures that high-latency WiFi transmissions or blocking network operations never delay the critical timing requirements of the physical sensor sampling loop.
+The system executes two independent execution threads: TaskSensing and TaskNetwork. TaskSensing operates at a strict 50Hz frequency, handling analog-to-digital conversions and resolving the core game state machine. Meanwhile, TaskNetwork asynchronously manages incoming and outgoing MQTT payloads. This decoupling ensures that high-latency WiFi transmissions or blocking network operations never delay the critical timing requirements of the physical sensor sampling loop.
 
 ### **Thread-Safe Resource Control**
 
 To manage data exchange between these independent threads, the firmware implements strict synchronization primitives. An asynchronous message queue (mqttQueue) buffers outbound transmission requests from the sensing task to the network task, preventing data dropping during network congestion. Additionally, a mutual exclusion semaphore (ledMutex) is deployed to protect the NeoPixel hardware. Since both the local sensing loop and the asynchronous MQTT callback can trigger visual updates simultaneously, the mutex prevents race conditions and corrupted memory access during LED operations.
 
-### **Digital Signal Processing Pipeline** 
-
-Raw analog inputs from the Force Sensitive Resistors undergo immediate processing to mitigate hardware noise. An Exponential Moving Average filter is applied sequentially to smooth voltage spikes. To accurately register physical impacts, a 700ms sliding window algorithm continuously tracks and stores the maximum filtered ADC peak. This guarantees transient strike data is captured reliably without requiring CPU polling rates.
+### **Digital Signal Processing Pipeline** 
+Raw analog inputs from the Force Sensitive Resistors undergo immediate processing to mitigate hardware noise. An Exponential Moving Average filter is applied sequentially to smooth voltage spikes. To accurately register physical impacts, a 700ms sliding window algorithm continuously tracks and stores the maximum filtered ADC peak. This guarantees transient strike data is captured reliably without requiring CPU polling rates.
 
 ### **MQTT**
-
 Remote communication utilizes a publish-subscribe messaging architecture. The software dynamically assigns MQTT topic subscriptions based on the hardware's identity flag, ensuring incoming payload weights map accurately to the corresponding local LED matrices.
 
 ### **Time-Bounded Target Logic**
-
 The local state machine enforces explicit temporal parameters to govern interactivity. A cooldown interval prevents duplicate target triggers caused by physical sensor bounce, while a timeout constraint automatically resets unaddressed remote targets. Visual feedback is mathematically mapped by constraining the incoming payload value and applying it to an HSV color wheel, shifting the localized LED arrays dynamically from blue to red based on impact severity.
 
 # Reflection and Future Work
-
 During development, there were some differences between the sketched design and the physical prototype, particularly in appearance and finishing. The way interaction and presentation were structured could be further refined to improve clarity and usability. The LED strip implementation is relatively simple; while safety was considered, the lighting effect could be enhanced, for example by reflecting light onto the wall instead of exposing it directly.
 
 &#x20;In terms of future work, the interaction between the two devices is still limited, and Wi-Fi settings are hardcoded, making network switching inconvenient. A dedicated application could allow flexible Wi-Fi connection and add features such as a time-limited competitive mode and a memory function to record and review past training sessions.
@@ -106,7 +101,7 @@ This project presented *Punch Reach*, an interactive punching training system co
 
 ---
 
-## References
+# References
 
 Cui, G. and Wang, C. (2025) ‘Applications and development trends of textile materials in sports: A review’, *Alexandria Engineering Journal*, 126, pp. 491–506.
 
