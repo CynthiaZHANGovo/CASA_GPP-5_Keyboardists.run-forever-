@@ -30,7 +30,7 @@ The panel itself is made of a layered composite structure. A visual representati
 
 The issue of mounting was considered an ergonomic problem. The rear side has a hook and loop system, which enables the user to install the wall without using tools and easily adjust the height up and down to suit users of all sizes. The panel angle was also optimized to match the natural path of a straight punch and this decreased the strain on the wrist during longer sessions.
 
-![Enclosure Iterations](https://raw.githubusercontent.com/CynthiaZHANGovo/CASA_GPP-5_Keyboardists.run-forever-/main/Documents/pictures/Materia.png)
+<img src="https://raw.githubusercontent.com/CynthiaZHANGovo/CASA_GPP-5_Keyboardists.run-forever-/main/Documents/pictures/Materia.png" width="300" alt="Materia">
 
 Through these iterations, the enclosure began a change to an active, load-carrying subsystem that conditions the quality of all interactions.
 
