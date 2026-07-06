@@ -1,0 +1,18 @@
+# --- Credentials (NEVER commit real secrets) ---
+project/secrets.h
+
+# --- Arduino / build artifacts ---
+build/
+*.hex
+*.bin
+*.elf
+*.map
+.build/
+*.o
+*.d
+
+# --- Editor / OS junk ---
+.vscode/
+.DS_Store
+Thumbs.db
+*.swp
