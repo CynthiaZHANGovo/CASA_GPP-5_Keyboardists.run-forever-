@@ -1,0 +1,8 @@
+{
+  "name": "DmaAdc",
+  "version": "1.0.0",
+  "description": "Free-running multi-channel ADC with DMA on SAMD21. The ADC scans the FSR pads in hardware and DMA copies each result into a RAM buffer, so the sensing task reads sensor values without ever busy-waiting on a conversion.",
+  "keywords": ["adc", "dma", "samd21", "free-running", "sensor"],
+  "frameworks": ["arduino"],
+  "platforms": ["atmelsam"]
+}
