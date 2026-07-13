@@ -1,0 +1,8 @@
+{
+  "name": "DmaNeoPixel",
+  "version": "1.0.0",
+  "description": "Non-blocking WS2812B driver for SAMD21 using a spare SERCOM in SPI mode fed by the DMA controller. LED refresh never disables global interrupts, so it does not starve the NINA-W102 WiFi SPI handshake.",
+  "keywords": ["ws2812b", "neopixel", "dma", "samd21", "sercom", "spi"],
+  "frameworks": ["arduino"],
+  "platforms": ["atmelsam"]
+}
