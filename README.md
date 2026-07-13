@@ -35,46 +35,180 @@ The issue of mounting was considered an ergonomic problem. The rear side has a h
 
 Through these iterations, the enclosure began a change to an active, load-carrying subsystem that conditions the quality of all interactions.
 
-## Hardware Implementation and Circuit Design
+# Boxing Duel — Two-Node Real-Time Interactive System
 
-This section outlines the hardware components and the circuit architecture utilized in the project. The system is built around the Arduino MKR WiFi 1010, which serves as the central processing unit. This microcontroller was selected for its compact form factor, native WiFi connectivity for potential IoT integration, and sufficient I/O pins to manage the project's analog and digital requirements simultaneously.
-<img src="https://raw.githubusercontent.com/CynthiaZHANGovo/CASA_GPP-5_Keyboardists.run-forever-/main/Documents/pictures/%20MCU.png" alt="MCU" width="300">
-### Sensors and Inputs
+A two-player reaction/force "boxing" duel built on two **Arduino MKR WiFi 1010**
+boards (Microchip **SAMD21G18A**, ARM Cortex-M0+). Each node reads four force
+pads, detects valid hits, and synchronises game state with the opposite node
+over MQTT, while driving four 7-LED WS2812B strips as force feedback.
 
-The primary input mechanisms are four FSR402 Force-Sensitive Resistors. These sensors dynamically alter their electrical resistance based on the physical pressure applied to their circular sensing areas. To interface these analog components with the microcontroller, they are configured within voltage divider circuits. As depicted in the system schematic, each FSR is connected in series with a $100\Omega$ pull-down resistor. One terminal of each FSR connects to the power supply (VCC), while the junction between the FSR and the pull-down resistor is routed to the Arduino's analog input pins (A2, A3, A4, and A5). This specific configuration allows the microcontroller's ADC (Analog-to-Digital Converter) to read varying voltage levels that directly correspond to the physical force applied to each sensor.
+Built with **PlatformIO** (not the Arduino IDE): a single `main.cpp` targets both
+boards, dependencies are pinned in `platformio.ini`, and the custom SPI+DMA LED
+driver is a proper library under `lib/`.
 
-<img src="https://raw.githubusercontent.com/CynthiaZHANGovo/CASA_GPP-5_Keyboardists.run-forever-/main/Documents/pictures/%20Sensor.png" alt="Sensor" width="300">
+The headline engineering problem was **keeping the WiFi link alive while
+refreshing addressable LEDs** — solved by moving LED output onto a spare
+**SERCOM in SPI mode fed by the DMA controller**, so LED refresh never disables
+global interrupts and never starves the NINA-W102 SPI handshake.
 
-### Actuators and Outputs
+---
 
-For visual feedback, the system incorporates four individual Addressable LED Strips. To ensure stable operation and avoid overloading the microcontroller's logic pins, the strips draw their main power from the shared 5V line and share a common ground (GND). The data input lines (Din) for the four separate LED strips are connected to the Arduino's digital PWM-capable pins (D0, D1, D2, and D3). By assigning a dedicated data pin to each strip, the system can independently control the lighting behavior, brightness, and color of each array in real-time.
+## System Architecture
 
-<img src="https://raw.githubusercontent.com/CynthiaZHANGovo/CASA_GPP-5_Keyboardists.run-forever-/main/Documents/pictures/led.png" alt="LED" width="300">
+```
+   ┌─────────────────────  NODE A (MKR WiFi 1010)  ─────────────────────┐
+   │                                                                    │
+   │  4x FSR ─ADC+DMA scan─►  EMA filter ─►  Hit FSM ─►  hitQueue        │
+   │           (free-running, no CPU)     (IDLE/ARMED/REFRACT)  │        │
+   │                                                         ▼          │
+   │  4x WS2812B ◄── SERCOM0 SPI + DMA (non-blocking) ◄── paintPad      │
+   │                                                         │  JSON    │
+   │                                                    TaskNetwork      │
+   └─────────────────────────────────────────────────────────┼─────────┘
+                                                              │ SERCOM1 SPI
+                                                       NINA-W102 (WiFi)
+                                                              │
+                                                       MQTT broker
+                                                  (mqtt.cetools.org)
+                                                              │
+                                                       NODE B (mirror)
+```
 
-Overall, the circuit is designed for multi-channel, responsive interaction. The hardware effectively maps four independent physical input channels to four distinct visual output channels (the LED strips) through the central processing of the MKR WiFi 1010.
+Two FreeRTOS tasks per node, **equal priority (2)** so the scheduler
+time-slices them fairly:
 
-<img src="https://raw.githubusercontent.com/CynthiaZHANGovo/CASA_GPP-5_Keyboardists.run-forever-/main/Documents/pictures/diagram.png" alt="Diagram" width="500">
+| Task          | Job                                            | Stack (words) |
+|---------------|------------------------------------------------|---------------|
+| `TaskSensing` | reads DMA-filled ADC buffer, EMA filter, hit FSM | 256         |
+| `TaskNetwork` | WiFi keepalive, MQTT pub/sub, JSON encode      | 1024          |
 
-## Software Design
+Sampling is offloaded from the CPU: a **free-running ADC** scans the four FSR
+pads in hardware and **DMA (channel 1)** copies each result into a RAM buffer,
+so `TaskSensing` reads the latest values without ever busy-waiting inside
+`analogRead()`. Two DMA channels are in use: **ch0** feeds the LEDs
+(SRAM→SPI), **ch1** fills the ADC buffer (ADC→SRAM).
 
-The software architecture for this IoT system is developed in C++ and leverages FreeRTOS on a SAMD21 microcontroller to guarantee deterministic execution of concurrent operations. The firmware is explicitly decoupled into specific functional domains to optimize local responsiveness while maintaining stable remote communication.
+Decoupled by `hitQueue` (force events); shared `gameState[]` guarded by
+`stateMutex`.
 
-### **FreeRTOS Task Management**
+**Interrupt priorities** are restructured by business rule (Cortex-M0+ has only
+4 levels): NINA handshake (EIC) = highest, NINA SPI (SERCOM1) = high, LED DMA
+completion (DMAC) = lowest — so WiFi responsiveness is never delayed by LED
+housekeeping.
 
-The system executes two independent execution threads: TaskSensing and TaskNetwork. TaskSensing operates at a strict 50Hz frequency, handling analog-to-digital conversions and resolving the core game state machine. Meanwhile, TaskNetwork asynchronously manages incoming and outgoing MQTT payloads. This decoupling ensures that high-latency WiFi transmissions or blocking network operations never delay the critical timing requirements of the physical sensor sampling loop.
+---
 
-### **Thread-Safe Resource Control**
+## Why SAMD21 / MKR WiFi 1010
 
-To manage data exchange between these independent threads, the firmware implements strict synchronization primitives. An asynchronous message queue (mqttQueue) buffers outbound transmission requests from the sensing task to the network task, preventing data dropping during network congestion. Additionally, a mutual exclusion semaphore (ledMutex) is deployed to protect the NeoPixel hardware. Since both the local sensing loop and the asynchronous MQTT callback can trigger visual updates simultaneously, the mutex prevents race conditions and corrupted memory access during LED operations.
+Driven by **peripherals, not headline memory**:
 
-### **Digital Signal Processing Pipeline** 
-Raw analog inputs from the Force Sensitive Resistors undergo immediate processing to mitigate hardware noise. An Exponential Moving Average filter is applied sequentially to smooth voltage spikes. To accurately register physical impacts, a 700ms sliding window algorithm continuously tracks and stores the maximum filtered ADC peak. This guarantees transient strike data is captured reliably without requiring CPU polling rates.
+- **12-channel DMAC + 12-channel Event System** — streams the LED waveform from
+  SRAM to SPI with zero CPU involvement (the core fix below).
+- **6× SERCOM** — one (SERCOM1) is reserved by WiFiNINA for the NINA link; a
+  spare (SERCOM0) drives the LEDs as SPI. Without free serial blocks this design
+  is impossible.
+- **32 KB SRAM** is comfortable: the whole DMA LED buffer is ~292 bytes
+  (28 LEDs × 9 bytes + reset gap). WiFi/TLS heavy lifting runs on the NINA-W102
+  (ESP32), *not* the SAMD21.
 
-### **MQTT**
-Remote communication utilizes a publish-subscribe messaging architecture. The software dynamically assigns MQTT topic subscriptions based on the hardware's identity flag, ensuring incoming payload weights map accurately to the corresponding local LED matrices.
+---
 
-### **Time-Bounded Target Logic**
-The local state machine enforces explicit temporal parameters to govern interactivity. A cooldown interval prevents duplicate target triggers caused by physical sensor bounce, while a timeout constraint automatically resets unaddressed remote targets. Visual feedback is mathematically mapped by constraining the incoming payload value and applying it to an HSV color wheel, shifting the localized LED arrays dynamically from blue to red based on impact severity.
+## The Core Problem & Fix: SPI + DMA WS2812B
+
+WS2812B is an 800 kHz return-to-zero protocol with ±150 ns timing tolerance.
+A bit-banged driver must `__disable_irq()` for the whole frame. On this board
+that masks the **NINA SPI handshake interrupt**, so the WiFi transaction times
+out and the link drops.
+
+**Fix:** encode each WS2812B bit into 3 SPI bits at ~2.4 MHz —
+`1 → 0b110`, `0 → 0b100` — and let the **DMAC** copy the encoded buffer into the
+SPI DATA register on the "TX-empty" trigger. The CPU fires the transfer and
+returns; **interrupts are never disabled**. See `lib/DmaNeoPixel/` for the
+encoding theory and register-level setup.
+
+```
+1 colour byte  -> 24 SPI bits = 3 SPI bytes
+1 LED (GRB)    -> 9 SPI bytes
+28 LEDs        -> 252 bytes + ~40 reset bytes = 292-byte DMA buffer
+```
+
+---
+
+## Known Trade-offs (honest engineering notes)
+
+- **MQTT QoS 0**: no PUBACK round-trip → lowest latency; cost is no delivery
+  guarantee, acceptable because hit/release events are idempotent and re-asserted
+  by the sender's FSM.
+- **Equal task priority + time-slicing** trades strict preemption for fairness;
+  safe because the sensing task is short and bounded.
+- **Latency (~100 ms)** is one-way application latency on a campus-LAN broker,
+  not a hard real-time bound and not an internet RTT. See the LATENCY NOTE in
+  `src/main.cpp`.
+- **DMA channels**: the LED driver uses DMAC channel 0 and the ADC driver uses
+  channel 1. The SAMD21 DMAC keeps all channel descriptors in one base-address
+  table indexed by channel number; in a fully integrated build both drivers must
+  share that single descriptor array (each writing only its own channel's slot).
+  The drivers are written as separate modules for clarity — merging their
+  descriptor tables is the one integration step to verify on real hardware.
+
+---
+
+## Wiring (per node)
+
+| Signal        | MKR 1010 pin | Notes                                  |
+|---------------|--------------|----------------------------------------|
+| FSR 1–4       | A1, A2, A3, A4 | voltage-divider to 3V3, 10k to GND   |
+| WS2812B data  | SERCOM0 MOSI pad | route with `pinPeripheral(pin, PIO_SERCOM_ALT)` |
+| WS2812B 5V/GND| 5V / GND     | inject power at the strip, common GND  |
+| NINA WiFi     | internal SERCOM1 | reserved by WiFiNINA — do not reuse |
+
+---
+
+## Build & Flash (PlatformIO)
+
+```bash
+# install PlatformIO Core (once)
+pip install platformio
+
+# copy the credential template and fill it in
+cp src/secrets.h.example src/secrets.h    # then edit src/secrets.h
+
+# build + flash node A
+pio run -e boardA -t upload
+
+# build + flash node B
+pio run -e boardB -t upload
+```
+
+One codebase, two identities via `-D BOARD_ID` in `platformio.ini` — no
+duplicated `boardA_code` / `boardB_code` files.
+
+> Dependency note: `WiFiNINA` + `FreeRTOS_SAMD21` version resolution on
+> PlatformIO can need manual pinning; the versions in `platformio.ini` are a
+> starting point.
+
+---
+
+## Repository Layout
+
+```
+platformio.ini            # board, framework, deps, boardA/boardB envs
+src/
+  main.cpp                # single codebase (A/B via -D BOARD_ID)
+  secrets.h.example       # credential template (real secrets.h is gitignored)
+lib/
+  DmaNeoPixel/
+    DmaNeoPixel.h         # SPI+DMA WS2812B driver — interface + encoding theory
+    DmaNeoPixel.cpp       # DMAC + SERCOM register-level implementation
+    library.json          # PlatformIO library manifest
+  DmaAdc/
+    DmaAdc.h              # free-running multi-channel ADC + DMA driver
+    DmaAdc.cpp            # ADC scan + DMAC channel 1 register-level setup
+    library.json          # PlatformIO library manifest
+Documents/
+  pictures/               # architecture diagram, wiring, scope captures
+  GPP_Minutes_*.md        # team meeting minutes
+```
 
 # Reflection and Future Work
 During development, there were some differences between the sketched design and the physical prototype, particularly in appearance and finishing. The way interaction and presentation were structured could be further refined to improve clarity and usability. The LED strip implementation is relatively simple; while safety was considered, the lighting effect could be enhanced, for example by reflecting light onto the wall instead of exposing it directly.
